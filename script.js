@@ -11,51 +11,32 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
+// Предопределяем переменные map и eventMap
+let map, mapEvent;
+
 // Использование geolocaton API
-//Проверяем поддерживает ли браузер
 if (navigator.geolocation) {
-  //Получаем наши координаты
+  //Наши координаты
   navigator.geolocation.getCurrentPosition(
     function (position) {
-      //Используем деструктуризацию для получения latitude, longitude
       const { latitude } = position.coords;
       const { longitude } = position.coords;
-
       const myCoordinates = [latitude, longitude];
 
       // Leaflet API
-      const map = L.map('map').setView(myCoordinates, 14);
+      map = L.map('map').setView(myCoordinates, 14);
 
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution:
           '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
       }).addTo(map);
 
-      // Применяем прослушиватель из библиотеки Leaflet для определения координат при клике на карту
-      map.on('click', function (mapEvent) {
-        console.log(mapEvent);
+      map.on('click', function (mapE) {
+        mapEvent = mapE;
 
-        const { lat, lng } = mapEvent.latlng;
-        const clickCoordinates = [lat, lng];
-
-        // Создает маркер на карте
-        L.marker(clickCoordinates)
-          .addTo(map)
-          // Создает попап на маркер, L.popap создает попап внутри попап
-          .bindPopup(
-            L.popup({
-              //Убираем автозакрывание попап, при добавлении нового маркера
-              autoClose: false,
-              // автозакрывание попап при клике на другой участок
-              closeOnClick: false,
-              maxWidth: 250,
-              maxHeight: 100,
-              // Задаем класс для возможности изм-я стилей в CSS
-              className: 'running-popup',
-              content: '<p>Workout</p>',
-            })
-          )
-          .openPopup();
+        // Отображаем форму
+        form.classList.remove('hidden');
+        inputDistance.focus();
       });
     },
     function () {
@@ -63,3 +44,40 @@ if (navigator.geolocation) {
     }
   );
 }
+
+// Прослушиваем событие отправки формы
+form.addEventListener('submit', function (e) {
+  e.preventDefault();
+
+  const { lat, lng } = mapEvent.latlng;
+  const clickCoordinates = [lat, lng];
+
+  // Очищаем инпуты формы, после ее отправки
+  inputDistance.value =
+    inputDuration.value =
+    inputCadence.value =
+    inputElevation.value =
+      '';
+  // Создаем маркер на карте, после события отправки формы
+  L.marker(clickCoordinates)
+    .addTo(map)
+    .bindPopup(
+      L.popup({
+        //При добавл. нов. маркера
+        autoClose: false,
+        // При клике на другой участок
+        closeOnClick: false,
+        maxWidth: 250,
+        maxHeight: 100,
+        className: 'running-popup',
+        content: '<p>Workout</p>',
+      })
+    )
+    .openPopup();
+});
+
+// Меняем отображение инпута cadence на elevation и наоборот
+inputType.addEventListener('change', function () {
+  inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
+  inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
+});
