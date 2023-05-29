@@ -11,73 +11,97 @@ const inputDuration = document.querySelector('.form__input--duration');
 const inputCadence = document.querySelector('.form__input--cadence');
 const inputElevation = document.querySelector('.form__input--elevation');
 
-// Предопределяем переменные map и eventMap
-let map, mapEvent;
+// Класс со всем функционалом прил-я
+class App {
+  // Предопределяем переменные map и eventMap как "приватные поля"
+  #map;
+  #mapEvent;
 
-// Использование geolocaton API
-if (navigator.geolocation) {
-  //Наши координаты
-  navigator.geolocation.getCurrentPosition(
-    function (position) {
-      const { latitude } = position.coords;
-      const { longitude } = position.coords;
-      const myCoordinates = [latitude, longitude];
+  constructor() {
+    // Получаем геопозицию + _loadMap(отображение карты), событие клик на карте.on + _showForm(отображение формы)
+    this._getPosition();
+    //  Событие отправки формы, очищает инпуты, ставит маркеры
+    form.addEventListener('submit', this._newWorkout.bind(this));
 
-      // Leaflet API
-      map = L.map('map').setView(myCoordinates, 14);
-
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution:
-          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(map);
-
-      map.on('click', function (mapE) {
-        mapEvent = mapE;
-
-        // Отображаем форму
-        form.classList.remove('hidden');
-        inputDistance.focus();
-      });
-    },
-    function () {
-      alert('Can not get your location');
+    // Изменение инпута cadence на elevation и наоборот
+    inputType.addEventListener('change', this._toggleElvationFielf);
+  }
+  // Получаем координаты, при удачной попытке выз-ся метод _loadMap
+  _getPosition() {
+    // Использование geolocaton API
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        this._loadMap.bind(this),
+        function () {
+          alert('Can not get your location');
+        }
+      );
     }
-  );
+  }
+
+  // Прогрузка карты
+  _loadMap(position) {
+    const { latitude } = position.coords;
+    const { longitude } = position.coords;
+    const myCoordinates = [latitude, longitude];
+
+    // Leaflet API
+    this.#map = L.map('map').setView(myCoordinates, 14);
+
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:
+        '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(this.#map);
+
+    // Прослушиваем клик на карту
+    this.#map.on('click', this._showForm.bind(this));
+  }
+
+  // Отображаем форму, назначаем значение mapEvent
+  _showForm(mapE) {
+    this.#mapEvent = mapE;
+    // Отображаем форму
+    form.classList.remove('hidden');
+    inputDistance.focus();
+  }
+
+  // Изменение инпута cadence на elevation и наоборот
+  _toggleElvationFielf() {
+    inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
+    inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
+  }
+
+  // Очищает инпуты, ставит маркеры
+  _newWorkout(e) {
+    e.preventDefault();
+
+    const { lat, lng } = this.#mapEvent.latlng;
+    const clickCoordinates = [lat, lng];
+
+    // Очищаем инпуты формы, после ее отправки
+    inputDistance.value =
+      inputDuration.value =
+      inputCadence.value =
+      inputElevation.value =
+        '';
+    // Создаем маркер на карте, после события отправки формы
+    L.marker(clickCoordinates)
+      .addTo(this.#map)
+      .bindPopup(
+        L.popup({
+          //При добавл. нов. маркера
+          autoClose: false,
+          // При клике на другой участок
+          closeOnClick: false,
+          maxWidth: 250,
+          maxHeight: 100,
+          className: 'running-popup',
+          content: '<p>Workout</p>',
+        })
+      )
+      .openPopup();
+  }
 }
 
-// Прослушиваем событие отправки формы
-form.addEventListener('submit', function (e) {
-  e.preventDefault();
-
-  const { lat, lng } = mapEvent.latlng;
-  const clickCoordinates = [lat, lng];
-
-  // Очищаем инпуты формы, после ее отправки
-  inputDistance.value =
-    inputDuration.value =
-    inputCadence.value =
-    inputElevation.value =
-      '';
-  // Создаем маркер на карте, после события отправки формы
-  L.marker(clickCoordinates)
-    .addTo(map)
-    .bindPopup(
-      L.popup({
-        //При добавл. нов. маркера
-        autoClose: false,
-        // При клике на другой участок
-        closeOnClick: false,
-        maxWidth: 250,
-        maxHeight: 100,
-        className: 'running-popup',
-        content: '<p>Workout</p>',
-      })
-    )
-    .openPopup();
-});
-
-// Меняем отображение инпута cadence на elevation и наоборот
-inputType.addEventListener('change', function () {
-  inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
-  inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
-});
+// Создаем экземпляр класса Appы
+const app = new App();
