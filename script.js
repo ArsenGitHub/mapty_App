@@ -103,5 +103,49 @@ class App {
   }
 }
 
-// Создаем экземпляр класса Appы
+// Классы для работы с данными
+class Workout {
+  // Публичные(внешние) поля
+  date = new Date();
+  // В качестве id просто возьмем кусок даты
+  id = (Date.now() + '').slice(-10);
+
+  constructor(distance, duration, coords) {
+    this.distance = distance;
+    this.duration = duration;
+    this.coords = coords; // [lat, lng]
+  }
+}
+
+class Running extends Workout {
+  constructor(distance, duration, coords, cadence) {
+    super(distance, duration, coords);
+    this.cadence = cadence;
+    //Вызываем сразу же при создании экземпляра
+    this.calcPace();
+  }
+
+  // Мин/метр
+  calcPace() {
+    this.pace = this.duration / this.distance;
+    return this.pace;
+  }
+}
+
+class Cycling extends Workout {
+  constructor(distance, duration, coords, elevationGain) {
+    super(distance, duration, coords);
+    this.elevationGain = elevationGain;
+    //Вызываем сразу же при создании экземпляра
+    this.calcSpeed();
+  }
+
+  // Скорость в км/ч
+  calcSpeed() {
+    this.speed = this.distance / (this.duration / 60);
+    return this.speed;
+  }
+}
+
+// Создаем экземпляр класса App
 const app = new App();
