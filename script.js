@@ -1,8 +1,5 @@
 'use strict';
 
-// prettier-ignore
-const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-
 const form = document.querySelector('.form');
 const containerWorkouts = document.querySelector('.workouts');
 const inputType = document.querySelector('.form__input--type');
@@ -23,7 +20,7 @@ class App {
     //  Событие отправки формы, очищает инпуты, ставит маркеры
     form.addEventListener('submit', this._newWorkout.bind(this));
     // Изменение инпута cadence на elevation и наоборот
-    inputType.addEventListener('change', this._toggleElvationFielf);
+    inputType.addEventListener('change', this._toggleInputCadToElev);
   }
   // Получаем координаты, при удачной попытке выз-ся метод _loadMap
   _getPosition() {
@@ -63,8 +60,23 @@ class App {
     inputDistance.focus();
   }
 
+  _hideForm() {
+    // Чтобы убрать отыгрываниен анимации формы(типа жалюзи, только в обратном порятке)
+    form.style.display = 'none';
+    form.classList.add('hidden');
+    // Ставим сначала display none, потом добавляем класс 'hidden' и только после того, как закончится анимация, добавляем display: grid
+    setTimeout(() => (form.style.display = 'grid'), 1000);
+
+    // Очищаем инпуты формы, после ее отправки
+    inputDistance.value =
+      inputDuration.value =
+      inputCadence.value =
+      inputElevation.value =
+        '';
+  }
+
   // Изменение инпута cadence на elevation и наоборот
-  _toggleElvationFielf() {
+  _toggleInputCadToElev() {
     inputCadence.closest('.form__row').classList.toggle('form__row--hidden');
     inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
   }
@@ -113,18 +125,17 @@ class App {
     this.#workouts.push(workout);
 
     // Отображаем маркер с попапом
-    this.renderWorkoutMarker(workout);
+    this._renderWorkoutMarker(workout);
 
-    // Очищаем инпуты формы, после ее отправки
-    inputDistance.value =
-      inputDuration.value =
-      inputCadence.value =
-      inputElevation.value =
-        '';
+    // Отображаем список тренировок в сайдбаре
+    this._renderWorkoutList(workout);
+
+    // Скрываем форму
+    this._hideForm();
   }
 
   //Создает маркер на карте
-  renderWorkoutMarker(workout) {
+  _renderWorkoutMarker(workout) {
     L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(
@@ -136,10 +147,62 @@ class App {
           maxWidth: 250,
           maxHeight: 100,
           className: `${inputType.value}-popup`,
-          content: `<p>${workout.distance}</p>`,
+          content: `<p>${workout.description}</p>`,
         })
       )
       .openPopup();
+  }
+
+  _renderWorkoutList(workout) {
+    let html = `
+      <li class="workout workout--${inputType.value}" data-id="${workout.id}">
+            <h2 class="workout__title">${workout.description}</h2>
+            <div class="workout__details">
+              <span class="workout__icon">${
+                inputType.value === 'running' ? '🏃‍♂️' : '🚴‍♀️'
+              }</span>
+              <span class="workout__value">${workout.distance}</span>
+              <span class="workout__unit">km</span>
+            </div>
+            <div class="workout__details">
+              <span class="workout__icon">⏱</span>
+              <span class="workout__value">${workout.duration}</span>
+              <span class="workout__unit">min</span>
+            </div>
+          `;
+    // Конкатенация строк
+    if (inputType.value === 'running') {
+      html += `
+        <div class="workout__details">
+          <span class="workout__icon">⚡️</span>
+          <span class="workout__value">${workout.pace.toFixed(1)}</span>
+          <span class="workout__unit">min/km</span>
+        </div>
+        <div class="workout__details">
+          <span class="workout__icon">🦶🏼</span>
+          <span class="workout__value">${workout.cadence}</span>
+          <span class="workout__unit">spm</span>
+        </div>
+      </li>
+      `;
+    }
+    if (inputType.value === 'cycling') {
+      html += `
+        <div class="workout__details">
+          <span class="workout__icon">⚡️</span>
+          <span class="workout__value">${workout.speed.toFixed(1)}</span>
+          <span class="workout__unit">km/h</span>
+        </div>
+        <div class="workout__details">
+          <span class="workout__icon">⛰</span>
+          <span class="workout__value">${workout.elevationGain}</span>
+          <span class="workout__unit">m</span>
+        </div>
+      </li>
+      `;
+    }
+    // Вставляем как соседнии элемент формы снизу
+    form.insertAdjacentHTML('afterend', html);
   }
 }
 
@@ -154,6 +217,18 @@ class Workout {
     this.distance = distance;
     this.duration = duration;
     this.coords = coords; // [lat, lng]
+    // Вызываем сразу.Метод устанавливает св-во, с описанием тренировки
+    this._setDescription();
+  }
+
+  // Метод устанавливает св-во, с описанием тренировки
+  _setDescription() {
+    // prettier-ignore
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+    this.description = `${
+      inputType.value[0].toUpperCase() + inputType.value.slice(1)
+    } on the ${this.date.getDate()} of ${months[this.date.getMonth()]}`;
   }
 }
 
