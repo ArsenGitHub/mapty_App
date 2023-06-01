@@ -13,22 +13,20 @@ const inputElevation = document.querySelector('.form__input--elevation');
 
 // Класс со всем функционалом прил-я
 class App {
-  // Предопределяем переменные map и eventMap как "приватные поля"
   #map;
   #mapEvent;
+  #workouts = [];
 
   constructor() {
     // Получаем геопозицию + _loadMap(отображение карты), событие клик на карте.on + _showForm(отображение формы)
     this._getPosition();
     //  Событие отправки формы, очищает инпуты, ставит маркеры
     form.addEventListener('submit', this._newWorkout.bind(this));
-
     // Изменение инпута cadence на elevation и наоборот
     inputType.addEventListener('change', this._toggleElvationFielf);
   }
   // Получаем координаты, при удачной попытке выз-ся метод _loadMap
   _getPosition() {
-    // Использование geolocaton API
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         this._loadMap.bind(this),
@@ -71,12 +69,51 @@ class App {
     inputElevation.closest('.form__row').classList.toggle('form__row--hidden');
   }
 
-  // Очищает инпуты, ставит маркеры
+  // Создает новый обьект с тренировкой и ставит маркер
   _newWorkout(e) {
     e.preventDefault();
 
+    // Функция для проверки валидности инпутов
+    const checkValid = (...arg) => {
+      return arg.every(val => val > 0);
+    };
+
+    // Координаты клика ч/з mapEvent Leafleat
     const { lat, lng } = this.#mapEvent.latlng;
     const clickCoordinates = [lat, lng];
+
+    // Данные из инпутов формы
+    const typeVal = inputType.value;
+    const distanceVal = +inputDistance.value;
+    const durationVal = +inputDuration.value;
+    const cadenceOrElevatVal =
+      typeVal === 'running' ? +inputCadence.value : +inputElevation.value;
+
+    // Проверяем на валидность
+    if (!checkValid(distanceVal, durationVal, cadenceOrElevatVal))
+      return alert('All inputs must be filled in and be greater than 0');
+
+    // Создаем обьект(экземпляр) с тренировкой
+    const workout =
+      typeVal === 'running'
+        ? new Running(
+            distanceVal,
+            durationVal,
+            clickCoordinates,
+            cadenceOrElevatVal
+          )
+        : new Cycling(
+            distanceVal,
+            durationVal,
+            clickCoordinates,
+            cadenceOrElevatVal
+          );
+
+    // Массив со всеми тренями
+    this.#workouts.push(workout);
+
+    // Отображаем маркер с попапом
+    this.renderWorkoutMarker(workout);
 
     // Очищаем инпуты формы, после ее отправки
     inputDistance.value =
@@ -84,8 +121,11 @@ class App {
       inputCadence.value =
       inputElevation.value =
         '';
-    // Создаем маркер на карте, после события отправки формы
-    L.marker(clickCoordinates)
+  }
+
+  //Создает маркер на карте
+  renderWorkoutMarker(workout) {
+    L.marker(workout.coords)
       .addTo(this.#map)
       .bindPopup(
         L.popup({
@@ -95,8 +135,8 @@ class App {
           closeOnClick: false,
           maxWidth: 250,
           maxHeight: 100,
-          className: 'running-popup',
-          content: '<p>Workout</p>',
+          className: `${inputType.value}-popup`,
+          content: `<p>${workout.distance}</p>`,
         })
       )
       .openPopup();
