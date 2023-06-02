@@ -21,6 +21,12 @@ class App {
     form.addEventListener('submit', this._newWorkout.bind(this));
     // Изменение инпута cadence на elevation и наоборот
     inputType.addEventListener('change', this._toggleInputCadToElev);
+    // Прослушиваем событие клика на список из тренировок, для смещения карты на маркер
+    // События(делегирование), клик на список с тренировками
+    containerWorkouts.addEventListener(
+      'click',
+      this._moveMapToMarker.bind(this)
+    );
   }
   // Получаем координаты, при удачной попытке выз-ся метод _loadMap
   _getPosition() {
@@ -33,25 +39,46 @@ class App {
       );
     }
   }
-
   // Прогрузка карты
   _loadMap(position) {
     const { latitude } = position.coords;
     const { longitude } = position.coords;
     const myCoordinates = [latitude, longitude];
-
     // Leaflet API
     this.#map = L.map('map').setView(myCoordinates, 14);
-
     L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution:
         '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(this.#map);
-
     // Прослушиваем клик на карту
     this.#map.on('click', this._showForm.bind(this));
   }
+  //Смещает карту на маркер
+  _moveMapToMarker(e) {
+    // Элемент на котором произошло событие(вслывает до родителя)
+    // Любой элемент являющися дочерним ul - т.е. список(весь блок li, h2, span...) с тренировкой
+    console.log(e.target);
 
+    //Возвращает ближайшего родителя html элемента с классом .workout(li)
+    const workoutListEl = e.target.closest('.workout');
+
+    // Зашитное предложение(Guard Clause)
+    if (!workoutListEl) return;
+
+    // Получаем обьект из массива со всеми тренировками и "вытаскиваем" координаты тренировки(маркера)
+    const markerCoord = this.#workouts.find(
+      val => val.id === workoutListEl.dataset.id
+    ).coords;
+
+    //Смещаем карту на маркер(Leaflet API)
+    this.#map.setView(markerCoord, 14, {
+      // Параметры с анимацией
+      animation: true,
+      pan: {
+        duration: 1,
+      },
+    });
+  }
   // Отображаем форму, назначаем значение mapEvent
   _showForm(mapE) {
     this.#mapEvent = mapE;
@@ -60,14 +87,11 @@ class App {
     inputDistance.focus();
   }
 
+  // Скрываем форму
   _hideForm() {
-    // Чтобы убрать отыгрываниен анимации формы(типа жалюзи, только в обратном порятке)
     form.style.display = 'none';
     form.classList.add('hidden');
-    // Ставим сначала display none, потом добавляем класс 'hidden' и только после того, как закончится анимация, добавляем display: grid
     setTimeout(() => (form.style.display = 'grid'), 1000);
-
-    // Очищаем инпуты формы, после ее отправки
     inputDistance.value =
       inputDuration.value =
       inputCadence.value =
@@ -84,27 +108,21 @@ class App {
   // Создает новый обьект с тренировкой и ставит маркер
   _newWorkout(e) {
     e.preventDefault();
-
     // Функция для проверки валидности инпутов
     const checkValid = (...arg) => {
       return arg.every(val => val > 0);
     };
-
     // Координаты клика ч/з mapEvent Leafleat
     const { lat, lng } = this.#mapEvent.latlng;
     const clickCoordinates = [lat, lng];
-
     // Данные из инпутов формы
     const typeVal = inputType.value;
     const distanceVal = +inputDistance.value;
     const durationVal = +inputDuration.value;
     const cadenceOrElevatVal =
       typeVal === 'running' ? +inputCadence.value : +inputElevation.value;
-
-    // Проверяем на валидность
     if (!checkValid(distanceVal, durationVal, cadenceOrElevatVal))
       return alert('All inputs must be filled in and be greater than 0');
-
     // Создаем обьект(экземпляр) с тренировкой
     const workout =
       typeVal === 'running'
@@ -123,13 +141,10 @@ class App {
 
     // Массив со всеми тренями
     this.#workouts.push(workout);
-
     // Отображаем маркер с попапом
     this._renderWorkoutMarker(workout);
-
     // Отображаем список тренировок в сайдбаре
     this._renderWorkoutList(workout);
-
     // Скрываем форму
     this._hideForm();
   }
@@ -140,19 +155,20 @@ class App {
       .addTo(this.#map)
       .bindPopup(
         L.popup({
-          //При добавл. нов. маркера
           autoClose: false,
-          // При клике на другой участок
           closeOnClick: false,
           maxWidth: 250,
           maxHeight: 100,
           className: `${inputType.value}-popup`,
-          content: `<p>${workout.description}</p>`,
+          content: `<p>${inputType.value === 'running' ? '🏃‍♂️' : '🚴‍♀️'} ${
+            workout.description
+          }</p>`,
         })
       )
       .openPopup();
   }
 
+  // Отображаем список с тренями
   _renderWorkoutList(workout) {
     let html = `
       <li class="workout workout--${inputType.value}" data-id="${workout.id}">
@@ -208,16 +224,13 @@ class App {
 
 // Классы для работы с данными
 class Workout {
-  // Публичные(внешние) поля
   date = new Date();
-  // В качестве id просто возьмем кусок даты
   id = (Date.now() + '').slice(-10);
 
   constructor(distance, duration, coords) {
     this.distance = distance;
     this.duration = duration;
     this.coords = coords; // [lat, lng]
-    // Вызываем сразу.Метод устанавливает св-во, с описанием тренировки
     this._setDescription();
   }
 
@@ -236,10 +249,8 @@ class Running extends Workout {
   constructor(distance, duration, coords, cadence) {
     super(distance, duration, coords);
     this.cadence = cadence;
-    //Вызываем сразу же при создании экземпляра
     this.calcPace();
   }
-
   // Мин/метр
   calcPace() {
     this.pace = this.duration / this.distance;
@@ -251,10 +262,8 @@ class Cycling extends Workout {
   constructor(distance, duration, coords, elevationGain) {
     super(distance, duration, coords);
     this.elevationGain = elevationGain;
-    //Вызываем сразу же при создании экземпляра
     this.calcSpeed();
   }
-
   // Скорость в км/ч
   calcSpeed() {
     this.speed = this.distance / (this.duration / 60);
@@ -262,5 +271,5 @@ class Cycling extends Workout {
   }
 }
 
-// Создаем экземпляр класса App
+// Создаем экземпляр класса App, чтобы constructor вызывался
 const app = new App();
